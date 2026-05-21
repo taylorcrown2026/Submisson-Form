@@ -34,6 +34,8 @@ const initDB = async () => {
 
 initDB();
 
+const XLSX = require("xlsx");
+
 app.set("trust proxy", true);
 app.use(express.json());
 app.use(express.static("."));
@@ -49,13 +51,64 @@ app.use(session({
   }
 }));
 
+app.get("/api/admin/export", async (req, res) => {
+  if (!req.session.auth) {
+    return res.sendStatus(401);
+  }
+
+  try {
+    const result = await pool.query(
+      "SELECT * FROM responses ORDER BY timestamp DESC"
+    );
+
+    // Convert DB rows → clean format for Excel
+    const data = result.rows.map((row) => ({
+      "Full Name": row.full_name,
+      "Location": row.location,
+      "Answer": row.answer,
+      "IP Address": row.ip_address,
+      "User Agent": row.user_agent,
+      "Submitted": new Date(row.timestamp).toLocaleString(),
+    }));
+
+    // Create worksheet
+    const worksheet = XLSX.utils.json_to_sheet(data);
+
+    // Create workbook
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Responses");
+
+    // Generate file buffer
+    const buffer = XLSX.write(workbook, {
+      type: "buffer",
+      bookType: "xlsx",
+    });
+
+    // Send file to browser
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=responses.xlsx"
+    );
+    res.type(
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+
+    res.send(buffer);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Export failed" });
+  }
+});
+
+
 /* =====================
    SUBMIT FORM
 ===================== */
+
 app.post("/api/submit", async (req, res) => {
   const ip =
-  req.headers["x-forwarded-for"]?.split(",")[0] ||
-  req.socket.remoteAddress;
+    req.headers["x-forwarded-for"]?.split(",")[0] ||
+    req.socket.remoteAddress;
 
   try {
     await pool.query(

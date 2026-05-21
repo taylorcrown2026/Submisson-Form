@@ -38,6 +38,7 @@
       <div class="muted" style="color:#d1fae5">Participant response tracking</div>
     </div>
     <div>
+      <button id="exportBtn">Export Excel</button>
       <button id="logoutBtn">Log out</button>
     </div>
   </header>
@@ -111,6 +112,10 @@
         "'": '&#39;'
       }[c]));
     }
+
+    document.getElementById("exportBtn").addEventListener("click", () => {
+  window.location.href = "/api/admin/export";
+});
 
     function formatDate(value) {
       try { return new Date(value).toLocaleString(); } catch { return value; }
