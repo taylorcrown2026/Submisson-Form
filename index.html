@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Check Testing Activity</title>
+  <style>
+    :root { --bg:#f5f7fb; --card:#ffffff; --text:#1f2937; --muted:#6b7280; --primary:#14532d; --primary2:#16a34a; --danger:#991b1b; --border:#d1d5db; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: Arial, Helvetica, sans-serif; background:linear-gradient(135deg,#eef7f0,#f8fafc); color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
+    .card { width:100%; max-width:720px; background:var(--card); border:1px solid #e5e7eb; border-radius:20px; box-shadow:0 20px 50px rgba(0,0,0,.08); overflow:hidden; }
+    .header { padding:28px 32px; background:#0f3d25; color:white; }
+    .header h1 { margin:0 0 8px; font-size:28px; }
+    .header p { margin:0; opacity:.9; line-height:1.5; }
+    form { padding:32px; }
+    label { display:block; font-weight:700; margin:18px 0 8px; }
+    input, select { width:100%; padding:13px 14px; border:1px solid var(--border); border-radius:12px; font-size:16px; background:white; }
+    fieldset { margin:20px 0; padding:18px; border:1px solid var(--border); border-radius:14px; }
+    legend { font-weight:700; padding:0 8px; }
+    .radio-row { display:flex; gap:16px; flex-wrap:wrap; margin-top:8px; }
+    .radio { flex:1; min-width:140px; border:1px solid var(--border); border-radius:14px; padding:14px; cursor:pointer; display:flex; align-items:center; gap:10px; }
+    .radio input { width:auto; }
+    .actions { display:flex; gap:12px; align-items:center; margin-top:22px; flex-wrap:wrap; }
+    button { border:0; background:var(--primary); color:white; padding:14px 22px; border-radius:12px; font-size:16px; font-weight:700; cursor:pointer; }
+    button:hover { background:var(--primary2); }
+    .admin-link { color:var(--primary); text-decoration:none; font-weight:700; }
+    .message { margin-top:18px; padding:14px; border-radius:12px; display:none; }
+    .success { background:#dcfce7; color:#14532d; border:1px solid #86efac; }
+    .error { background:#fee2e2; color:var(--danger); border:1px solid #fecaca; }
+    .small { color:var(--muted); font-size:13px; margin-top:12px; line-height:1.4; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <section class="header">
+      <h1>Check Testing Activity</h1>
+      <p>Please enter your full name, location, and whether you want to participate.</p>
+    </section>
+
+    <form id="activityForm" autocomplete="off">
+      <label for="fullName">Full name</label>
+      <input id="fullName" name="fullName" type="text" placeholder="First and last name" maxlength="120" required />
+
+      <label for="location">Location</label>
+      <select id="location" name="location" required>
+        <option value="">Select your location</option>
+        <option value="Cycle M - Concentra Health Services, Inc.">Cycle M - Concentra Health Services, Inc.</option>
+        <option value="Cycle PC1 - OHC of Arkansas, P.A.">Cycle PC1 - OHC of Arkansas, P.A.</option>
+        <option value="Cycle PC2 - OHC of California, A Med Corp">Cycle PC2 - OHC of California, A Med Corp</option>
+        <option value="Cycle PC3 - OHC of Delaware, P.A.">Cycle PC3 - OHC of Delaware, P.A.</option>
+        <option value="Cycle PC4 - OHC of Georgia, P.C.">Cycle PC4 - OHC of Georgia, P.C.</option>
+        <option value="Cycle PC5 - OHC of Hawaii, Inc.">Cycle PC5 - OHC of Hawaii, Inc.</option>
+        <option value="Cycle PC6 - OHC of Illinois, P.C.">Cycle PC6 - OHC of Illinois, P.C.</option>
+        <option value="Cycle PC7 - OHC of Kansas, P.A.">Cycle PC7 - OHC of Kansas, P.A.</option>
+        <option value="Cycle PC8 - OHC of Louisiana, P.C.">Cycle PC8 - OHC of Louisiana, P.C.</option>
+        <option value="Cycle PC9 - OHC of Michigan, P.C.">Cycle PC9 - OHC of Michigan, P.C.</option>
+        <option value="Cycle PC10 - OHC of Nebraska, P.C.">Cycle PC10 - OHC of Nebraska, P.C.</option>
+        <option value="Cycle PC11 - OHC of New Jersey, P.A.">Cycle PC11 - OHC of New Jersey, P.A.</option>
+        <option value="Cycle PC12 - OHC of New York, P.A.">Cycle PC12 - OHC of New York, P.A.</option>
+        <option value="Cycle PC13 - OHC of North Carolina, P.C.">Cycle PC13 - OHC of North Carolina, P.C.</option>
+        <option value="Cycle PC14 - OHC of Ohio, P.A.">Cycle PC14 - OHC of Ohio, P.A.</option>
+        <option value="Cycle PC15 - OHC of the Southwest, P.A. (AZ)">Cycle PC15 - OHC of the Southwest, P.A. (AZ)</option>
+        <option value="Cycle PC16 - OHC of the Southwest, P.A. (TX)">Cycle PC16 - OHC of the Southwest, P.A. (TX)</option>
+        <option value="Cycle PC17 - Therapy Centers of South Carolina, P.A.">Cycle PC17 - Therapy Centers of South Carolina, P.A.</option>
+        <option value="Cycle PC18 - Therapy Centers of the Southwest, P.A.">Cycle PC18 - Therapy Centers of the Southwest, P.A.</option>
+        <option value="Cycle PC23 - OHC of Minnesota, P.C.">Cycle PC23 - OHC of Minnesota, P.C.</option>
+        <option value="Cycle PC24 - OHC of Washington, P.S.">Cycle PC24 - OHC of Washington, P.S.</option>
+        <option value="Cycle PC25 - OHC of Alaska, P.C.">Cycle PC25 - OHC of Alaska, P.C.</option>
+        <option value="Cycle PC30 - OHC of West Virginia P.C.">Cycle PC30 - OHC of West Virginia P.C.</option>
+      </select>
+
+      <fieldset>
+        <legend>Do you want to participate in the check testing activity?</legend>
+        <div class="radio-row">
+          <label class="radio"><input type="radio" name="answer" value="Yes" required /> Yes</label>
+          <label class="radio"><input type="radio" name="answer" value="No" required /> No</label>
+        </div>
+      </fieldset>
+
+      <div class="actions">
+        <button type="submit">Submit</button>
+        <a class="admin-link" href="/login.html">Admin login</a>
+      </div>
+
+      <p class="small">Your response will be securely recorded with timestamp and network information for compliance review.</p>
+      <div id="message" class="message"></div>
+    </form>
+  </main>
+
+  <script>
+    const form = document.getElementById('activityForm');
+    const message = document.getElementById('message');
+
+    function showMessage(text, type) {
+      message.textContent = text;
+      message.className = 'message ' + type;
+      message.style.display = 'block';
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      const formData = new FormData(form);
+      const payload = {
+        fullName: String(formData.get('fullName') || '').trim(),
+        location: formData.get('location'),
+        answer: formData.get('answer')
+      };
+
+      try {
+        const res = await fetch('/api/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || 'Submission failed');
+        }
+
+        form.reset();
+        showMessage('Thank you. Your response has been submitted.', 'success');
+      } catch (err) {
+        showMessage(err.message || 'Unable to submit response.', 'error');
+      }
+    });
+  </script>
+</body>
+</html>
