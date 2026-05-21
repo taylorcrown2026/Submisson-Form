@@ -6,10 +6,15 @@ const app = express();
 app.use(express.json());
 app.use(express.static("."));
 
+
 app.use(session({
-  secret: "secret",
+  secret: process.env.SESSION_SECRET || "dev-secret",
   resave: false,
-  saveUninitialized: false
+  saveUninitialized: false,
+  cookie: {
+    secure: true,
+    sameSite: "none"
+  }
 }));
 
 let responses = [];
@@ -46,11 +51,11 @@ app.post("/api/login", (req, res) => {
 app.set('trust proxy', 1);
 
 app.use(session({
-  secret: "secret",
+  secret: process.env.SESSION_SECRET || "dev-secret",
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: true,       // required on Render HTTPS
+    secure: true,
     sameSite: "none"
   }
 }));
@@ -78,11 +83,11 @@ app.post("/api/logout", (req, res) => {
 app.set('trust proxy', 1);
 
 app.use(session({
-  secret: "secret",
+  secret: process.env.SESSION_SECRET || "dev-secret",
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: true,       // required on Render HTTPS
+    secure: true,
     sameSite: "none"
   }
 }));
