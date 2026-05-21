@@ -9,6 +9,7 @@
   "dependencies": {
     "express": "^4.19.2",
     "express-session": "^1.17.3",
-    "pg": "^8.11.5"
+    "pg": "^8.11.5",
+    "xlsx": "^0.18.5"
   }
 }

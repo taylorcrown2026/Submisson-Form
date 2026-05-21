@@ -1,4 +1,5 @@
 const express = require("express");
+const XLSX = require("xlsx");
 const session = require("express-session");
 
 const app = express();
@@ -33,8 +34,6 @@ const initDB = async () => {
 };
 
 initDB();
-
-const XLSX = require("xlsx");
 
 app.set("trust proxy", true);
 app.use(express.json());
