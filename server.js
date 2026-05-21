@@ -34,6 +34,7 @@ const initDB = async () => {
 
 initDB();
 
+app.set("trust proxy", true);
 app.use(express.json());
 app.use(express.static("."));
 
@@ -52,7 +53,9 @@ app.use(session({
    SUBMIT FORM
 ===================== */
 app.post("/api/submit", async (req, res) => {
-  const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
+  const ip =
+  req.headers["x-forwarded-for"]?.split(",")[0] ||
+  req.socket.remoteAddress;
 
   try {
     await pool.query(
@@ -110,7 +113,17 @@ app.get("/api/admin/responses", async (req, res) => {
     const result = await pool.query(
       "SELECT * FROM responses ORDER BY timestamp DESC"
     );
-    res.json({ responses: result.rows });
+
+    const formatted = result.rows.map((row) => ({
+      fullName: row.full_name,
+      location: row.location,
+      answer: row.answer,
+      ipAddress: row.ip_address,
+      userAgent: row.user_agent,
+      timestamp: row.timestamp,
+    }));
+
+    res.json({ responses: formatted });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Database error" });
