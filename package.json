@@ -1,0 +1,15 @@
+{
+  "name": "express-form-app",
+  "version": "1.0.0",
+  "description": "Simple Express form + admin portal",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "express-session": "^1.17.3",
+    "pg": "^8.11.5",
+    "xlsx": "^0.18.5"
+  }
+}
