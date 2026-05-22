@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Portal</title>
+  <style>
+    :root { --green:#0f3d25; --light:#f8fafc; --border:#e5e7eb; --text:#111827; --muted:#6b7280; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Arial, Helvetica, sans-serif; background:var(--light); color:var(--text); }
+    header { background:var(--green); color:white; padding:22px 28px; display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap; }
+    header h1 { margin:0; font-size:24px; }
+    button, .button { border:0; background:#14532d; color:white; padding:11px 16px; border-radius:12px; cursor:pointer; font-weight:700; text-decoration:none; display:inline-block; }
+    button:hover, .button:hover { background:#16a34a; }
+    main { padding:24px; max-width:1280px; margin:0 auto; }
+    .stats { display:grid; grid-template-columns:repeat(4,minmax(150px,1fr)); gap:16px; margin-bottom:18px; }
+    .stat { background:white; border:1px solid var(--border); border-radius:18px; padding:18px; box-shadow:0 6px 20px rgba(0,0,0,.04); }
+    .stat .num { font-size:30px; font-weight:800; margin-top:6px; }
+    .toolbar { background:white; border:1px solid var(--border); border-radius:18px; padding:16px; margin-bottom:18px; display:grid; grid-template-columns:2fr 1fr 2fr auto; gap:12px; align-items:end; }
+    label { font-weight:700; font-size:13px; color:#374151; display:block; margin-bottom:6px; }
+    input, select { width:100%; padding:11px 12px; border:1px solid #d1d5db; border-radius:12px; font-size:14px; }
+    .table-wrap { background:white; border:1px solid var(--border); border-radius:18px; overflow:auto; box-shadow:0 6px 20px rgba(0,0,0,.04); }
+    table { width:100%; border-collapse:collapse; min-width:980px; }
+    th, td { padding:13px 14px; border-bottom:1px solid var(--border); text-align:left; font-size:14px; vertical-align:top; }
+    th { background:#f9fafb; font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:#4b5563; cursor:pointer; }
+    tr:hover td { background:#fcfcfd; }
+    .pill { display:inline-block; padding:5px 10px; border-radius:999px; font-weight:800; font-size:12px; }
+    .yes { background:#dcfce7; color:#14532d; }
+    .no { background:#fee2e2; color:#991b1b; }
+    .muted { color:var(--muted); }
+    @media (max-width:900px) { .stats { grid-template-columns:repeat(2,1fr); } .toolbar { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Admin Portal</h1>
+      <div class="muted" style="color:#d1fae5">Participant response tracking</div>
+    </div>
+    <div>
+      <button id="exportBtn">Export Excel</button>
+      <button id="logoutBtn">Log out</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="stats">
+      <div class="stat"><div class="muted">Total responses</div><div id="total" class="num">0</div></div>
+      <div class="stat"><div class="muted">Yes responses</div><div id="yesCount" class="num">0</div></div>
+      <div class="stat"><div class="muted">No responses</div><div id="noCount" class="num">0</div></div>
+      <div class="stat"><div class="muted">Locations represented</div><div id="locationCount" class="num">0</div></div>
+    </section>
+
+    <section class="toolbar">
+      <div>
+        <label for="search">Search name, location, IP</label>
+        <input id="search" placeholder="Search responses" />
+      </div>
+
+      <div>
+        <label for="answerFilter">Answer</label>
+        <select id="answerFilter">
+          <option value="All">All</option>
+          <option value="Yes">Yes</option>
+          <option value="No">No</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="locationFilter">Location</label>
+        <select id="locationFilter">
+          <option value="All">All locations</option>
+        </select>
+      </div>
+
+      <button id="refreshBtn">Refresh</button>
+    </section>
+
+    <section class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th data-sort="timestamp">Submitted</th>
+            <th data-sort="fullName">Full Name</th>
+            <th data-sort="answer">Answer</th>
+            <th data-sort="workEmail">Work Email</th>
+            <th data-sort="userAgent">User Agent</th>
+          </tr>
+        </thead>
+        <tbody id="responseRows"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script>
+    let responses = [];
+    let sortKey = 'timestamp';
+    let sortDir = 'desc';
+
+    const rows = document.getElementById('responseRows');
+    const search = document.getElementById('search');
+    const answerFilter = document.getElementById('answerFilter');
+    const locationFilter = document.getElementById('locationFilter');
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, (c) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[c]));
+    }
+
+    document.getElementById("exportBtn").addEventListener("click", () => {
+  window.location.href = "/api/admin/export";
+});
+
+    function formatDate(value) {
+      try { return new Date(value).toLocaleString(); } catch { return value; }
+    }
+
+    async function loadResponses() {
+      const res = await fetch('/api/admin/responses');
+      if (res.status === 401) {
+        window.location.href = '/login.html';
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      responses = data.responses || [];
+      populateLocationFilter();
+      render();
+    }
+
+    function populateLocationFilter() {
+      const current = locationFilter.value;
+      const locations = [...new Set(responses.map(r => r.location).filter(Boolean))].sort();
+      locationFilter.innerHTML = '<option value="All">All locations</option>' +
+        locations.map(l => `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`).join('');
+      locationFilter.value = locations.includes(current) ? current : 'All';
+    }
+
+    function getFiltered() {
+      const q = search.value.trim().toLowerCase();
+      let data = responses.filter(r => {
+        const matchesQ = !q || [r.fullName, r.workEmail, r.answer, r.userAgent]
+          .some(v => String(v || '').toLowerCase().includes(q));
+        const matchesA = answerFilter.value === 'All' || r.answer === answerFilter.value;
+        const matchesL = locationFilter.value === 'All' || r.location === locationFilter.value;
+        return matchesQ && matchesA && matchesL;
+      });
+
+      data.sort((a, b) => {
+        let av = a[sortKey];
+        let bv = b[sortKey];
+
+        if (sortKey === 'timestamp') {
+          av = new Date(av).getTime();
+          bv = new Date(bv).getTime();
+        } else {
+          av = String(av || '').toLowerCase();
+          bv = String(bv || '').toLowerCase();
+        }
+
+        if (av < bv) return sortDir === 'asc' ? -1 : 1;
+        if (av > bv) return sortDir === 'asc' ? 1 : -1;
+        return 0;
+      });
+
+      return data;
+    }
+
+    function render() {
+      const yes = responses.filter(r => r.answer === 'Yes').length;
+      const no = responses.filter(r => r.answer === 'No').length;
+
+      document.getElementById('total').textContent = responses.length;
+      document.getElementById('yesCount').textContent = yes;
+      document.getElementById('noCount').textContent = no;
+// Example: unique emails
+document.getElementById('locationCount').textContent =
+  new Set(responses.map(r => r.workEmail).filter(Boolean)).size;
+
+      const data = getFiltered();
+      rows.innerHTML = data.length
+        ? data.map(r => `
+            <tr>
+              <td>${escapeHtml(formatDate(r.timestamp))}</td>
+              <td><strong>${escapeHtml(r.fullName)}</strong></td>
+              <td><span class="pill ${r.answer === 'Yes' ? 'yes' : 'no'}">${escapeHtml(r.answer)}</span></td>
+              <td>${escapeHtml(r.workEmail)}</td>
+              <td>${escapeHtml(r.userAgent)}</td>
+            </tr>
+          `).join('')
+        : '<tr><td colspan="6" class="muted">No responses found.</td></tr>';
+    }
+
+    document.querySelectorAll('th[data-sort]').forEach(th =>
+      th.addEventListener('click', () => {
+        const key = th.dataset.sort;
+        if (sortKey === key) sortDir = (sortDir === 'asc') ? 'desc' : 'asc';
+        else { sortKey = key; sortDir = 'asc'; }
+        render();
+      })
+    );
+
+    [search, answerFilter, locationFilter].forEach(el =>
+      el.addEventListener('input', render)
+    );
+
+    document.getElementById('refreshBtn').addEventListener('click', loadResponses);
+
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      await fetch('/api/logout', { method: 'POST' });
+      window.location.href = '/login.html';
+    });
+
+    loadResponses();
+  </script>
+</body>
+</html>
