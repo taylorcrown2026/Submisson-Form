@@ -15,16 +15,22 @@ const pool = new Pool({
 
 const initDB = async () => {
   try {
-await pool.query(`
-  CREATE TABLE IF NOT EXISTS responses (
-    id SERIAL PRIMARY KEY,
-    full_name TEXT,
-    work_email TEXT,
-    answer TEXT,
-    user_agent TEXT,
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  );
-`);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS responses (
+        id SERIAL PRIMARY KEY,
+        full_name TEXT,
+        work_email TEXT,
+        answer TEXT,
+        user_agent TEXT,
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // ✅ Ensure column exists (safe migration)
+    await pool.query(`
+      ALTER TABLE responses
+      ADD COLUMN IF NOT EXISTS work_email TEXT;
+    `);
 
     console.log("✅ Database ready");
   } catch (err) {
