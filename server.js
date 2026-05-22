@@ -161,12 +161,17 @@ const ADMIN_PASS_HASH = process.env.ADMIN_PASS_HASH;
 app.post("/api/login", loginLimiter, async (req, res) => {
   const { username, password } = req.body;
 
+  console.log("LOGIN ATTEMPT:", username, password);
+
   try {
-    if (username !== ADMIN_USER) {
+    if (username !== process.env.ADMIN_USER) {
+      console.log("Username mismatch");
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    const match = await bcrypt.compare(password, ADMIN_PASS_HASH);
+    const match = await bcrypt.compare(password, process.env.ADMIN_PASS_HASH);
+
+    console.log("Password match result:", match);
 
     if (!match) {
       return res.status(401).json({ error: "Invalid credentials" });
