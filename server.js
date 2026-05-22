@@ -1,5 +1,7 @@
 const express = require("express");
 const XLSX = require("xlsx");
+const bcrypt = require("bcrypt");
+const rateLimit = require("express-rate-limit");
 const session = require("express-session");
 
 const app = express();
@@ -99,19 +101,40 @@ const data = result.rows.map((row) => ({
 
 app.post("/api/submit", async (req, res) => {
   try {
+    const email = String(req.body.workEmail || "").trim().toLowerCase();
+
+    // ✅ Enforce company domain
+    if (!email.endsWith("@concentra.com")) {
+      return res.status(400).json({
+        error: "Please use your @concentra.com email"
+      });
+    }
+
+    const existing = await pool.query(
+  "SELECT 1 FROM responses WHERE work_email = $1",
+  [email]
+);
+
+if (existing.rowCount > 0) {
+  return res.status(400).json({
+    error: "This email has already submitted a response"
+  });
+}
+
     await pool.query(
       `INSERT INTO responses 
        (full_name, work_email, answer, user_agent)
        VALUES ($1, $2, $3, $4)`,
       [
         req.body.fullName,
-        req.body.workEmail,
+        email,
         req.body.answer,
         req.headers["user-agent"],
       ]
     );
 
     res.json({ success: true });
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Database error" });
@@ -122,12 +145,41 @@ app.post("/api/submit", async (req, res) => {
 /* =====================
    LOGIN
 ===================== */
-app.post("/api/login", (req, res) => {
-  if (req.body.username === "admin" && req.body.password === "password") {
+
+const ADMIN_USER = process.env.ADMIN_USER || "admin";
+const ADMIN_PASS_HASH = process.env.ADMIN_PASS_HASH;
+
+app.post("/api/login", loginLimiter, async (req, res) => {
+  const { username, password } = req.body;
+
+  try {
+    if (username !== ADMIN_USER) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const match = await bcrypt.compare(password, ADMIN_PASS_HASH);
+
+    if (!match) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
     req.session.auth = true;
-    return res.json({ success: true });
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Login error" });
   }
-  res.status(401).json({ error: "Invalid credentials" });
+});
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // only 10 attempts
+  message: {
+    error: "Too many login attempts. Try again later."
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
 app.set('trust proxy', 1);
