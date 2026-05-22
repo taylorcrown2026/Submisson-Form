@@ -59,8 +59,6 @@ const initDB = async () => {
 
 initDB();
 
-bcrypt.hash("admin123", 10).then(h => console.log("✅ GENERATED HASH:", h));
-
 /* =====================
    MIDDLEWARE
 ===================== */
