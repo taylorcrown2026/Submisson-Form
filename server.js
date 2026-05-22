@@ -2,6 +2,15 @@ const express = require("express");
 const XLSX = require("xlsx");
 const bcrypt = require("bcrypt");
 const rateLimit = require("express-rate-limit");
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // only 10 attempts
+  message: {
+    error: "Too many login attempts. Try again later."
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 const session = require("express-session");
 
 const app = express();
@@ -170,16 +179,6 @@ app.post("/api/login", loginLimiter, async (req, res) => {
     console.error(err);
     res.status(500).json({ error: "Login error" });
   }
-});
-
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // only 10 attempts
-  message: {
-    error: "Too many login attempts. Try again later."
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
 });
 
 app.set('trust proxy', 1);
