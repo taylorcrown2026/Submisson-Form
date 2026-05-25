@@ -50,13 +50,27 @@
   required 
 />
 
-      <fieldset>
-        <legend>I will be available to receive and deposit the check on Wednesday, 5/27/2026</legend>
-        <div class="radio-row">
-          <label class="radio"><input type="radio" name="answer" value="Yes" required /> Yes</label>
-          <label class="radio"><input type="radio" name="answer" value="No" required /> No</label>
-        </div>
-      </fieldset>
+<label>Department</label>
+<select name="department" required>
+  <option value="">Select department</option>
+  <option>HR</option>
+  <option>Finance</option>
+  <option>IT</option>
+  <option>Operations</option>
+  <option>Clinical</option>
+  <option>Legal</option>
+</select>
+
+<label>Month</label>
+<select name="month" required>
+  <option>January</option>
+  <option>February</option>
+  <option>March</option>
+  ...
+</select>
+
+<label>Upload Org Chart (PDF or Visio)</label>
+<input type="file" name="file" accept=".pdf,.vsdx" required>
 
       <div class="actions">
         <button type="submit">Submit</button>
@@ -83,6 +97,11 @@ Thanks for assisting with bringing Concentra Payroll Services Live!
       event.preventDefault();
 
       const formData = new FormData(form);
+
+await fetch('/api/submit', {
+  method: 'POST',
+  body: formData
+});
 const payload = {
   fullName: String(formData.get('fullName') || '').trim(),
   workEmail: String(formData.get('workEmail') || '').trim(),

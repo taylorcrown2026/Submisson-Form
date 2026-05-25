@@ -38,18 +38,41 @@
       <div class="muted" style="color:#d1fae5">Participant response tracking</div>
     </div>
     <div>
+      <button id="closeMonthBtn">Close Month</button>
+      <button id="sendEmailsBtn">Send Reminder Emails</button>
       <button id="exportBtn">Export Excel</button>
       <button id="logoutBtn">Log out</button>
     </div>
   </header>
 
   <main>
-    <section class="stats">
-      <div class="stat"><div class="muted">Total responses</div><div id="total" class="num">0</div></div>
-      <div class="stat"><div class="muted">Yes responses</div><div id="yesCount" class="num">0</div></div>
-      <div class="stat"><div class="muted">No responses</div><div id="noCount" class="num">0</div></div>
-      <div class="stat"><div class="muted">Locations represented</div><div id="locationCount" class="num">0</div></div>
-    </section>
+
+    <section style="margin-bottom:20px;">
+  <button id="currentTab">Current Month</button>
+  <button id="historyTab">View Previous Months</button>
+</section>
+
+<section class="stats">
+  <div class="stat">
+    <div class="muted">Total Submissions</div>
+    <div id="total" class="num">0</div>
+  </div>
+
+  <div class="stat">
+    <div class="muted">Departments Completed</div>
+    <div id="completed" class="num">0</div>
+  </div>
+
+  <div class="stat">
+    <div class="muted">Departments Missing</div>
+    <div id="missing" class="num">0</div>
+  </div>
+
+  <div class="stat">
+    <div class="muted">Selected Month</div>
+    <div id="selectedMonth" class="num">-</div>
+  </div>
+</section>
 
     <section class="toolbar">
       <div>
@@ -58,23 +81,53 @@
       </div>
 
       <div>
-        <label for="answerFilter">Answer</label>
-        <select id="answerFilter">
-          <option value="All">All</option>
-          <option value="Yes">Yes</option>
-          <option value="No">No</option>
-        </select>
-      </div>
+  <label for="monthFilter">Month</label>
+  <select id="monthFilter">
+    <option value="All">All</option>
+    <option>January</option>
+    <option>February</option>
+    <option>March</option>
+    <option>April</option>
+    <option>May</option>
+    <option>June</option>
+    <option>July</option>
+    <option>August</option>
+    <option>September</option>
+    <option>October</option>
+    <option>November</option>
+    <option>December</option>
+  </select>
+</div>
 
-      <div>
-        <label for="locationFilter">Location</label>
-        <select id="locationFilter">
-          <option value="All">All locations</option>
-        </select>
-      </div>
+<div>
+  <label for="departmentFilter">Department</label>
+  <select id="departmentFilter">
+    <option value="All">All</option>
+    <option>HR</option>
+    <option>Finance</option>
+    <option>IT</option>
+    <option>Operations</option>
+    <option>Clinical</option>
+    <option>Legal</option>
+  </select>
+</div>
+
+<div>
+  <label for="statusFilter">Submission Status</label>
+  <select id="statusFilter">
+    <option value="All">All</option>
+    <option value="Submitted">Submitted</option>
+    <option value="Missing">Missing</option>
+  </select>
+</div>
 
       <button id="refreshBtn">Refresh</button>
     </section>
+
+    <section id="missingBox" style="margin-bottom:20px;">
+  <h3>Missing Departments</h3>
+  <div id="missingList" style="color:#991b1b;font-weight:bold;"></div>
+</section>
 
     <section class="table-wrap">
       <table>
@@ -82,9 +135,10 @@
           <tr>
             <th data-sort="timestamp">Submitted</th>
             <th data-sort="fullName">Full Name</th>
-            <th data-sort="answer">Answer</th>
-            <th data-sort="workEmail">Work Email</th>
-            <th data-sort="userAgent">User Agent</th>
+<th>Department</th>
+<th>Month</th>
+<th>File</th>
+<th>Email</th>
           </tr>
         </thead>
         <tbody id="responseRows"></tbody>
@@ -99,8 +153,9 @@
 
     const rows = document.getElementById('responseRows');
     const search = document.getElementById('search');
-    const answerFilter = document.getElementById('answerFilter');
-    const locationFilter = document.getElementById('locationFilter');
+  const departmentFilter = document.getElementById('departmentFilter');
+  const statusFilter = document.getElementById('statusFilter');
+  const monthFilter = document.getElementById('monthFilter');
 
     function escapeHtml(value) {
       return String(value ?? '').replace(/[&<>"']/g, (c) => ({
@@ -115,6 +170,18 @@
     document.getElementById("exportBtn").addEventListener("click", () => {
   window.location.href = "/api/admin/export";
 });
+
+let viewMode = "current";
+
+document.getElementById('currentTab').onclick = () => {
+  viewMode = "current";
+  render();
+};
+
+document.getElementById('historyTab').onclick = () => {
+  viewMode = "history";
+  render();
+};
 
     function formatDate(value) {
       try { return new Date(value).toLocaleString(); } catch { return value; }
@@ -140,46 +207,81 @@
       locationFilter.value = locations.includes(current) ? current : 'All';
     }
 
-    function getFiltered() {
-      const q = search.value.trim().toLowerCase();
-      let data = responses.filter(r => {
-        const matchesQ = !q || [r.fullName, r.workEmail, r.answer, r.userAgent]
-          .some(v => String(v || '').toLowerCase().includes(q));
-        const matchesA = answerFilter.value === 'All' || r.answer === answerFilter.value;
-        const matchesL = locationFilter.value === 'All' || r.location === locationFilter.value;
-        return matchesQ && matchesA && matchesL;
-      });
+function getFiltered() {
+  const q = search.value.trim().toLowerCase();
 
-      data.sort((a, b) => {
-        let av = a[sortKey];
-        let bv = b[sortKey];
+  let data = responses.filter(r => {
+    const matchesQ =
+      !q || [r.fullName, r.workEmail, r.department]
+      .some(v => String(v || '').toLowerCase().includes(q));
 
-        if (sortKey === 'timestamp') {
-          av = new Date(av).getTime();
-          bv = new Date(bv).getTime();
-        } else {
-          av = String(av || '').toLowerCase();
-          bv = String(bv || '').toLowerCase();
-        }
+    const matchesDept =
+      departmentFilter.value === 'All' || r.department === departmentFilter.value;
 
-        if (av < bv) return sortDir === 'asc' ? -1 : 1;
-        if (av > bv) return sortDir === 'asc' ? 1 : -1;
-        return 0;
-      });
+    const matchesMonth =
+      monthFilter.value === 'All' || r.month === monthFilter.value;
 
-      return data;
-    }
+      const isCurrent = r.month === monthFilter.value;
+
+const matchesView =
+  viewMode === "current"
+    ? (monthFilter.value === 'All' || isCurrent)
+    : true;
+
+    return matchesQ && matchesDept && matchesMonth && matchesView;
+  });
+
+  return data;
+}
+
+document.getElementById('closeMonthBtn').addEventListener('click', () => {
+  const months = [
+    "January","February","March","April","May","June",
+    "July","August","September","October","November","December"
+  ];
+
+  let current = monthFilter.value;
+  let index = months.indexOf(current);
+
+  if (index === -1) {
+    alert("Select a valid month first");
+    return;
+  }
+
+  const nextMonth = months[index + 1] || months[0];
+
+  alert(`Month ${current} closed. Moving to ${nextMonth}`);
+
+  monthFilter.value = nextMonth;
+  render();
+});
 
     function render() {
-      const yes = responses.filter(r => r.answer === 'Yes').length;
-      const no = responses.filter(r => r.answer === 'No').length;
+const selectedMonth = monthFilter.value;
 
-      document.getElementById('total').textContent = responses.length;
-      document.getElementById('yesCount').textContent = yes;
-      document.getElementById('noCount').textContent = no;
-// Example: unique emails
-document.getElementById('locationCount').textContent =
-  new Set(responses.map(r => r.workEmail).filter(Boolean)).size;
+// If "All" is selected, show everything, otherwise filter by month
+const filteredMonthData =
+  selectedMonth === 'All'
+    ? responses
+    : responses.filter(r => r.month === selectedMonth);
+
+// Master department list
+const ALL_DEPARTMENTS = ["HR","Finance","IT","Operations","Clinical","Legal"];
+
+// Get departments that submitted
+const submittedDepts = filteredMonthData.map(r => r.department);
+
+// Remove duplicates
+const uniqueSubmitted = [...new Set(submittedDepts)];
+
+// Find missing departments
+const missingDepts = ALL_DEPARTMENTS.filter(d => !uniqueSubmitted.includes(d));
+
+// Update dashboard numbers
+document.getElementById('total').textContent = filteredMonthData.length;
+document.getElementById('completed').textContent = uniqueSubmitted.length;
+document.getElementById('missing').textContent = missingDepts.length;
+document.getElementById('selectedMonth').textContent = selectedMonth;
 
       const data = getFiltered();
       rows.innerHTML = data.length
@@ -187,9 +289,11 @@ document.getElementById('locationCount').textContent =
             <tr>
               <td>${escapeHtml(formatDate(r.timestamp))}</td>
               <td><strong>${escapeHtml(r.fullName)}</strong></td>
-              <td><span class="pill ${r.answer === 'Yes' ? 'yes' : 'no'}">${escapeHtml(r.answer)}</span></td>
-              <td>${escapeHtml(r.workEmail)}</td>
-              <td>${escapeHtml(r.userAgent)}</td>
+<td>${escapeHtml(r.department)}</td>
+<td>${escapeHtml(r.month)}</td>
+<td>
+  <a href="${r.fileUrl}" target>
+<td>${escapeHtml(r.workEmail)}</td>
             </tr>
           `).join('')
         : '<tr><td colspan="6" class="muted">No responses found.</td></tr>';
@@ -204,9 +308,9 @@ document.getElementById('locationCount').textContent =
       })
     );
 
-    [search, answerFilter, locationFilter].forEach(el =>
-      el.addEventListener('input', render)
-    );
+[search, answerFilter, locationFilter, monthFilter].forEach(el =>
+  el.addEventListener('input', render)
+);
 
     document.getElementById('refreshBtn').addEventListener('click', loadResponses);
 
@@ -216,6 +320,54 @@ document.getElementById('locationCount').textContent =
     });
 
     loadResponses();
+
+    const ALL_DEPARTMENTS = [
+  "HR",
+  "Finance",
+  "IT",
+  "Operations",
+  "Clinical",
+  "Legal"
+];
+
+function renderMissing() {
+  const selectedMonth = monthFilter.value;
+
+  if (selectedMonth === 'All') {
+    document.getElementById('missingList').textContent = '';
+    return;
+  }
+
+  const submitted = responses
+    .filter(r => r.month === selectedMonth)
+    .map(r => r.department);
+
+  const missing = ALL_DEPARTMENTS.filter(d => !submitted.includes(d));
+
+  document.getElementById('missingList').textContent =
+    missing.length ? missing.join(", ") : "All departments submitted ✅";
+}
+
+renderMissing();
+
+document.getElementById('sendEmailsBtn').addEventListener('click', async () => {
+  const month = prompt("Enter month to send reminders for:");
+
+  if (!month) return;
+
+  const res = await fetch('/api/admin/send-reminders', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ month })
+  });
+
+  const data = await res.json();
+
+  alert("Emails sent to: " + (data.sentTo || []).join(", "));
+});
+
   </script>
 </body>
 </html>

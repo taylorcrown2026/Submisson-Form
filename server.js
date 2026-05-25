@@ -34,21 +34,24 @@ const pool = new Pool({
 
 const initDB = async () => {
   try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS responses (
-        id SERIAL PRIMARY KEY,
-        full_name TEXT,
-        work_email TEXT,
-        answer TEXT,
-        user_agent TEXT,
-        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
+await pool.query(`
+  CREATE TABLE IF NOT EXISTS responses (
+    id SERIAL PRIMARY KEY,
+    full_name TEXT,
+    work_email TEXT,
+    department TEXT,
+    month TEXT,
+    file_path TEXT,
+    user_agent TEXT,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+`);
 
     // ensure column exists
     await pool.query(`
       ALTER TABLE responses
       ADD COLUMN IF NOT EXISTS work_email TEXT;
+      ALTER TABLE responses DROP COLUMN IF EXISTS answer;
     `);
 
     console.log("✅ Database ready");
@@ -58,6 +61,15 @@ const initDB = async () => {
 };
 
 initDB();
+
+const DEPARTMENTS = [
+  "HR",
+  "Finance",
+  "IT",
+  "Operations",
+  "Clinical",
+  "Legal"
+];
 
 /* =====================
    MIDDLEWARE
@@ -76,6 +88,35 @@ app.use(session({
     sameSite: "none"
   }
 }));
+
+const multer = require("multer");
+const path = require("path");
+
+const storage = multer.diskStorage({
+  destination: "uploads/",
+  filename: (req, file, cb) => {
+    const unique = Date.now() + "-" + file.originalname;
+    cb(null, unique);
+  }
+});
+
+const upload = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    const allowed = [
+      "application/pdf",
+      "application/vnd.visio"
+    ];
+
+    if (allowed.includes(file.mimetype) || file.originalname.endsWith(".vsdx")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only PDF or Visio files allowed"));
+    }
+  }
+});
+
+app.use("/uploads", express.static("uploads"));
 
 /* =====================
    LOGIN
@@ -115,37 +156,46 @@ app.post("/api/login", loginLimiter, async (req, res) => {
 /* =====================
    SUBMIT FORM
 ===================== */
-app.post("/api/submit", async (req, res) => {
+app.post("/api/submit", upload.single("file"), async (req, res) => {
   try {
     const email = String(req.body.workEmail || "").trim().toLowerCase();
+    const department = req.body.department;
+    const month = req.body.month;
 
-    // ✅ enforce company email
     if (!email.endsWith("@concentra.com")) {
-      return res.status(400).json({
-        error: "Please use your @concentra.com email"
-      });
+      return res.status(400).json({ error: "Use @concentra.com email" });
     }
 
-    // ✅ prevent duplicates
+    if (!DEPARTMENTS.includes(department)) {
+      return res.status(400).json({ error: "Invalid department" });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: "File is required" });
+    }
+
+    // prevent duplicate per month + department
     const existing = await pool.query(
-      "SELECT 1 FROM responses WHERE work_email = $1",
-      [email]
+      `SELECT 1 FROM responses WHERE department = $1 AND month = $2`,
+      [department, month]
     );
 
     if (existing.rowCount > 0) {
       return res.status(400).json({
-        error: "This email has already submitted a response"
+        error: "This department already submitted for that month"
       });
     }
 
     await pool.query(
       `INSERT INTO responses 
-       (full_name, work_email, answer, user_agent)
-       VALUES ($1, $2, $3, $4)`,
+      (full_name, work_email, department, month, file_path, user_agent)
+      VALUES ($1,$2,$3,$4,$5,$6)`,
       [
         req.body.fullName,
         email,
-        req.body.answer,
+        department,
+        month,
+        req.file.filename,
         req.headers["user-agent"]
       ]
     );
@@ -154,7 +204,7 @@ app.post("/api/submit", async (req, res) => {
 
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Database error" });
+    res.status(500).json({ error: "Submission failed" });
   }
 });
 
@@ -171,13 +221,14 @@ app.get("/api/admin/responses", async (req, res) => {
       "SELECT * FROM responses ORDER BY timestamp DESC"
     );
 
-    const formatted = result.rows.map(r => ({
-      fullName: r.full_name,
-      workEmail: r.work_email,
-      answer: r.answer,
-      userAgent: r.user_agent,
-      timestamp: r.timestamp
-    }));
+const formatted = result.rows.map(r => ({
+  fullName: r.full_name,
+  workEmail: r.work_email,
+  department: r.department,
+  month: r.month,
+  fileUrl: `/uploads/${r.file_path}`,
+  timestamp: r.timestamp
+}));
 
     res.json({ responses: formatted });
 
@@ -240,6 +291,35 @@ app.post("/api/logout", (req, res) => {
   req.session.destroy(() => {
     res.json({ success: true });
   });
+});
+
+app.post("/api/admin/send-reminders", async (req, res) => {
+  const { month } = req.body;
+
+  // map department → email
+  const departmentEmails = {
+    HR: "hr@company.com",
+    Finance: "finance@company.com",
+    IT: "it@company.com"
+  };
+
+  const submitted = await pool.query(
+    "SELECT department FROM responses WHERE month = $1",
+    [month]
+  );
+
+  const submittedDepts = submitted.rows.map(r => r.department);
+
+  const missing = Object.keys(departmentEmails)
+    .filter(d => !submittedDepts.includes(d));
+
+  // send emails ONLY to missing
+  for (const dept of missing) {
+    const email = departmentEmails[dept];
+    // send mail (nodemailer logic here)
+  }
+
+  res.json({ sentTo: missing });
 });
 
 /* =====================
