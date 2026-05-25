@@ -159,16 +159,16 @@ app.post("/api/login", loginLimiter, async (req, res) => {
 app.post("/api/submit", upload.single("file"), async (req, res) => {
   try {
     const email = String(req.body.workEmail || "").trim().toLowerCase();
-    const department = req.body.department;
+    const department = String(req.body.department || "").trim();
     const month = req.body.month;
 
     if (!email.endsWith("@concentra.com")) {
       return res.status(400).json({ error: "Use @concentra.com email" });
     }
 
-    if (!DEPARTMENTS.includes(department)) {
-      return res.status(400).json({ error: "Invalid department" });
-    }
+if (!DEPARTMENTS.map(d => d.toLowerCase()).includes(department.toLowerCase())) {
+  return res.status(400).json({ error: "Invalid department" });
+}
 
     if (!req.file) {
       return res.status(400).json({ error: "File is required" });
