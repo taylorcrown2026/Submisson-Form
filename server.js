@@ -27,6 +27,8 @@ const transporter = nodemailer.createTransport({
 
 const app = express();
 
+app.set("trust proxy", 1);
+
 /* =====================
    ENV CONFIG
 ===================== */
@@ -163,7 +165,7 @@ const DEPARTMENT_EMAILS = {
   "Reimbursement Government Relations Reimbursement": "tcrownover@concentra.com",
   "Reimbursement Government Relations Coding Compliance": "tcrownover@concentra.com",
   "Reimbursement Government Relations Group Health Managed Care Contracting": "tcrownover@concentra.com",
-  "Accounting & Finance": "tcrownover@concentra.com",
+  "Accounting and Finance": "tcrownover@concentra.com",
   "IS Leadership Concentra": "tcrownover@concentra.com",
   "HR Leadership": "tcrownover@concentra.com",
   "HR Services": "tcrownover@concentra.com",
@@ -176,6 +178,10 @@ const DEPARTMENT_EMAILS = {
 
 const DEPARTMENTS = Object.keys(DEPARTMENT_EMAILS);
 
+app.get("/api/departments", (req, res) => {
+  res.json({ departments: DEPARTMENTS });
+});
+
 const sendReminders = async () => {
   const now = new Date();
   const currentMonth = now.toLocaleString('default', { month: 'long' });
@@ -186,8 +192,9 @@ const sendReminders = async () => {
       [currentMonth]
     );
 
-    const submitted = result.rows.map(r => r.department);
-    const missing = DEPARTMENTS.filter(d => !submitted.includes(d));
+    const submitted = result.rows.map(r => r.department.trim().toLowerCase());
+    const missing = DEPARTMENTS.filter(
+  d => !submitted.includes(d.trim().toLowerCase()));
 
     console.log("Missing departments:", missing);
 
@@ -212,8 +219,6 @@ Thank you.
 
       console.log("✅ Email sent to:", dept);
     }
-
-    console.log(`Email sent to ${dept} (${email})`);
 
   } catch (err) {
     console.error("❌ Reminder error:", err);
