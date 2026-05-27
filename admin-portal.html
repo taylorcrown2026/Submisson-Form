@@ -187,6 +187,11 @@ document.getElementById('historyTab').onclick = () => {
     }
 
     async function loadResponses() {
+    const now = new Date();
+    const currentMonth = now.toLocaleString('default', { month: 'long' });
+    monthFilter.value = currentMonth;
+
+
       const res = await fetch('/api/admin/responses');
       if (res.status === 401) {
         window.location.href = '/login.html';
@@ -266,9 +271,8 @@ document.getElementById('selectedMonth').textContent = selectedMonth;
 <td>${escapeHtml(r.department)}</td>
 <td>${escapeHtml(r.month)}</td>
 <td>
-  .fileUrl}" target="_blank">View</a>
-  |
-  /api/download/${r.fileUrl.split('/').pop()}">⬇</a>
+  <a href="${r.fileUrl}" target="_blank" class="button">View</a>
+  <a href="/api/download/${r.fileUrl.split('/').pop()}" class="button">⬇</a>
 </td>
 <td>${escapeHtml(r.workEmail)}</td>
             </tr>
