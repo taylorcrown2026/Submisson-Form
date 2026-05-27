@@ -7,6 +7,13 @@ const { Pool } = require("pg");
 const multer = require("multer");
 const path = require("path");
 
+
+const fs = require("fs");
+if (!fs.existsSync("uploads")) {
+  fs.mkdirSync("uploads");
+}
+
+
 const app = express();
 
 /* =====================
@@ -182,6 +189,8 @@ app.post("/api/submit", upload.single("file"), async (req, res) => {
       ]
     );
 
+    console.log("Saved file:", req.file.path);
+
     res.json({ success: true });
   } catch (err) {
     console.error(err);
@@ -234,6 +243,17 @@ app.get("/api/admin/export", async (req, res) => {
 
 app.post("/api/logout", (req, res) => {
   req.session.destroy(() => res.json({ success: true }));
+});
+
+app.get("/api/download/:filename", (req, res) => {
+  const filePath = path.join(__dirname, "uploads", req.params.filename);
+
+  res.download(filePath, err => {
+    if (err) {
+      console.error("Download error:", err);
+      res.status(404).send("File not found");
+    }
+  });
 });
 
 /* =====================
