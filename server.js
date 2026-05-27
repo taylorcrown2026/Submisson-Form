@@ -242,6 +242,20 @@ cron.schedule("0 9 * * *", () => {
   }
 });
 
+app.get("/api/clear-may", async (req, res) => {
+  try {
+    await pool.query(
+      "DELETE FROM responses WHERE month = 'May'"
+    );
+
+    res.send("✅ All May submissions deleted");
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("❌ Failed to delete May data");
+  }
+});
+
 /* =====================
    LOGIN
 ===================== */
