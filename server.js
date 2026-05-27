@@ -4,8 +4,6 @@ const bcrypt = require("bcrypt");
 const rateLimit = require("express-rate-limit");
 const session = require("express-session");
 const { Pool } = require("pg");
-const multer = require("multer");
-const path = require("path");
 
 const app = express();
 
@@ -20,7 +18,10 @@ const ADMIN_PASS_HASH = process.env.ADMIN_PASS_HASH;
 ===================== */
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10
+  max: 10,
+  message: {
+    error: "Too many login attempts. Try again later."
+  }
 });
 
 /* =====================
@@ -28,32 +29,53 @@ const loginLimiter = rateLimit({
 ===================== */
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL
-    ? { rejectUnauthorized: false }
-    : false
+  ssl: { rejectUnauthorized: false }
 });
 
 const initDB = async () => {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS responses (
-      id SERIAL PRIMARY KEY,
-      full_name TEXT,
-      work_email TEXT,
-      department TEXT,
-      month TEXT,
-      file_path TEXT,
-      user_agent TEXT,
-      timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
+  try {
+await pool.query(`
+  CREATE TABLE IF NOT EXISTS responses (
+    id SERIAL PRIMARY KEY,
+    full_name TEXT,
+    work_email TEXT,
+    department TEXT,
+    month TEXT,
+    file_path TEXT,
+    user_agent TEXT,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+`);
 
-  console.log("✅ Database ready");
+    // ensure column exists
+    await pool.query(`
+      ALTER TABLE responses
+      ADD COLUMN IF NOT EXISTS work_email TEXT;
+      ALTER TABLE responses DROP COLUMN IF EXISTS answer;
+    `);
+
+    console.log("✅ Database ready");
+  } catch (err) {
+    console.error("❌ DB init error:", err);
+  }
 };
+
 initDB();
+
+const DEPARTMENTS = [
+  "HR",
+  "Finance",
+  "IT",
+  "Operations",
+  "Clinical",
+  "Legal"
+];
 
 /* =====================
    MIDDLEWARE
 ===================== */
+app.set("trust proxy", 1);
+
 app.use(express.json());
 app.use(express.static("."));
 
@@ -62,35 +84,39 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false, // ✅ works locally
-    sameSite: "lax"
+    secure: true,
+    sameSite: "none"
   }
 }));
 
-/* =====================
-   FILE UPLOAD
-===================== */
+const multer = require("multer");
+const path = require("path");
+
 const storage = multer.diskStorage({
   destination: "uploads/",
   filename: (req, file, cb) => {
-    cb(null, Date.now() + "-" + file.originalname);
+    const unique = Date.now() + "-" + file.originalname;
+    cb(null, unique);
   }
 });
 
 const upload = multer({
   storage,
   fileFilter: (req, file, cb) => {
-    if (
-      file.mimetype === "application/pdf" ||
-      file.originalname.endsWith(".vsdx")
-    ) cb(null, true);
-    else cb(new Error("Only PDF or Visio"));
+    const allowed = [
+      "application/pdf",
+      "application/vnd.visio"
+    ];
+
+    if (allowed.includes(file.mimetype) || file.originalname.endsWith(".vsdx")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only PDF or Visio files allowed"));
+    }
   }
 });
 
 app.use("/uploads", express.static("uploads"));
-
-const DEPARTMENTS = ["HR","Finance","IT","Operations","Clinical","Legal"];
 
 /* =====================
    LOGIN
@@ -98,31 +124,46 @@ const DEPARTMENTS = ["HR","Finance","IT","Operations","Clinical","Legal"];
 app.post("/api/login", loginLimiter, async (req, res) => {
   const { username, password } = req.body;
 
-  if (username !== ADMIN_USER) {
-    return res.status(401).json({ error: "Invalid credentials" });
+  console.log("---- LOGIN DEBUG ----");
+  console.log("Input username:", username);
+  console.log("Input password:", password);
+  console.log("ENV USER:", ADMIN_USER);
+  console.log("ENV HASH:", ADMIN_PASS_HASH);
+
+  try {
+    if (username !== ADMIN_USER) {
+      console.log("❌ Username mismatch");
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const match = await bcrypt.compare(password, ADMIN_PASS_HASH);
+
+    console.log("✅ bcrypt match result:", match);
+
+    if (!match) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    req.session.auth = true;
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Login error" });
   }
-
-  const match = await bcrypt.compare(password, ADMIN_PASS_HASH);
-
-  if (!match) {
-    return res.status(401).json({ error: "Invalid credentials" });
-  }
-
-  req.session.auth = true;
-  res.json({ success: true });
 });
 
 /* =====================
-   SUBMIT
+   SUBMIT FORM
 ===================== */
 app.post("/api/submit", upload.single("file"), async (req, res) => {
   try {
-    const email = String(req.body.workEmail || "").toLowerCase().trim();
+    const email = String(req.body.workEmail || "").trim().toLowerCase();
     const department = req.body.department;
     const month = req.body.month;
 
     if (!email.endsWith("@concentra.com")) {
-      return res.status(400).json({ error: "Use company email" });
+      return res.status(400).json({ error: "Use @concentra.com email" });
     }
 
     if (!DEPARTMENTS.includes(department)) {
@@ -130,22 +171,23 @@ app.post("/api/submit", upload.single("file"), async (req, res) => {
     }
 
     if (!req.file) {
-      return res.status(400).json({ error: "File required" });
+      return res.status(400).json({ error: "File is required" });
     }
 
+    // prevent duplicate per month + department
     const existing = await pool.query(
-      `SELECT 1 FROM responses WHERE department=$1 AND month=$2`,
+      `SELECT 1 FROM responses WHERE department = $1 AND month = $2`,
       [department, month]
     );
 
     if (existing.rowCount > 0) {
       return res.status(400).json({
-        error: "Already submitted for that department/month"
+        error: "This department already submitted for that month"
       });
     }
 
     await pool.query(
-      `INSERT INTO responses
+      `INSERT INTO responses 
       (full_name, work_email, department, month, file_path, user_agent)
       VALUES ($1,$2,$3,$4,$5,$6)`,
       [
@@ -159,6 +201,7 @@ app.post("/api/submit", upload.single("file"), async (req, res) => {
     );
 
     res.json({ success: true });
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Submission failed" });
@@ -166,54 +209,124 @@ app.post("/api/submit", upload.single("file"), async (req, res) => {
 });
 
 /* =====================
-   ADMIN APIs
+   ADMIN: GET RESPONSES
 ===================== */
 app.get("/api/admin/responses", async (req, res) => {
-  if (!req.session.auth) return res.sendStatus(401);
+  if (!req.session.auth) {
+    return res.sendStatus(401);
+  }
 
-  const result = await pool.query("SELECT * FROM responses ORDER BY timestamp DESC");
+  try {
+    const result = await pool.query(
+      "SELECT * FROM responses ORDER BY timestamp DESC"
+    );
 
-  res.json({
-    responses: result.rows.map(r => ({
-      fullName: r.full_name,
-      workEmail: r.work_email,
-      department: r.department,
-      month: r.month,
-      fileUrl: `/uploads/${r.file_path}`,
-      timestamp: r.timestamp
-    }))
-  });
-});
+const formatted = result.rows.map(r => ({
+  fullName: r.full_name,
+  workEmail: r.work_email,
+  department: r.department,
+  month: r.month,
+  fileUrl: `/uploads/${r.file_path}`,
+  timestamp: r.timestamp
+}));
 
-app.get("/api/admin/export", async (req, res) => {
-  if (!req.session.auth) return res.sendStatus(401);
+    res.json({ responses: formatted });
 
-  const result = await pool.query("SELECT * FROM responses");
-
-  const data = result.rows.map(r => ({
-    "Full Name": r.full_name,
-    "Email": r.work_email,
-    "Department": r.department,
-    "Month": r.month,
-    "Submitted": new Date(r.timestamp).toLocaleString()
-  }));
-
-  const ws = XLSX.utils.json_to_sheet(data);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Responses");
-
-  const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
-
-  res.setHeader("Content-Disposition", "attachment; filename=data.xlsx");
-  res.send(buffer);
-});
-
-app.post("/api/logout", (req, res) => {
-  req.session.destroy(() => res.json({ success: true }));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Database error" });
+  }
 });
 
 /* =====================
-   START
+   ADMIN: EXPORT EXCEL
+===================== */
+app.get("/api/admin/export", async (req, res) => {
+  if (!req.session.auth) {
+    return res.sendStatus(401);
+  }
+
+  try {
+    const result = await pool.query(
+      "SELECT * FROM responses ORDER BY timestamp DESC"
+    );
+
+    const data = result.rows.map(row => ({
+      "Full Name": row.full_name,
+      "Work Email": row.work_email,
+      "Answer": row.answer,
+      "User Agent": row.user_agent,
+      "Submitted": new Date(row.timestamp).toLocaleString()
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Responses");
+
+    const buffer = XLSX.write(workbook, {
+      type: "buffer",
+      bookType: "xlsx"
+    });
+
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=responses.xlsx"
+    );
+    res.type(
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+
+    res.send(buffer);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Export failed" });
+  }
+});
+
+/* =====================
+   LOGOUT
+===================== */
+app.post("/api/logout", (req, res) => {
+  req.session.destroy(() => {
+    res.json({ success: true });
+  });
+});
+
+app.post("/api/admin/send-reminders", async (req, res) => {
+  const { month } = req.body;
+
+  // map department → email
+  const departmentEmails = {
+    HR: "hr@company.com",
+    Finance: "finance@company.com",
+    IT: "it@company.com"
+  };
+
+  const submitted = await pool.query(
+    "SELECT department FROM responses WHERE month = $1",
+    [month]
+  );
+
+  const submittedDepts = submitted.rows.map(r => r.department);
+
+  const missing = Object.keys(departmentEmails)
+    .filter(d => !submittedDepts.includes(d));
+
+  // send emails ONLY to missing
+  for (const dept of missing) {
+    const email = departmentEmails[dept];
+    // send mail (nodemailer logic here)
+  }
+
+  res.json({ sentTo: missing });
+});
+
+/* =====================
+   START SERVER
 ===================== */
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("✅ Running on", PORT));
+
+app.listen(PORT, () => {
+  console.log("✅ Server running on port", PORT);
+});

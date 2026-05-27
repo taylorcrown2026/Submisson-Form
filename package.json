@@ -1,18 +1,20 @@
 {
-  "name": "concentra-check-app",
-  "version": "1.0.0",
-  "description": "Payroll check submission system",
+  "name": "express-form-app",
+  "version": "2.0.0",
+  "description": "Org Chart Submission System with Admin Portal",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "bcrypt": "^5.1.0",
+    "bcrypt": "^5.1.1",
     "express": "^4.19.2",
-    "express-rate-limit": "^7.0.0",
+    "express-rate-limit": "^7.3.0",
     "express-session": "^1.17.3",
-    "multer": "^1.4.5-lts.1",
     "pg": "^8.11.5",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+
+    "multer": "^1.4.5-lts.1",
+    "nodemailer": "^6.9.13"
   }
 }

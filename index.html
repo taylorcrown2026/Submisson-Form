@@ -63,19 +63,10 @@
 
 <label>Month</label>
 <select name="month" required>
-  <option value="">Select month</option>
   <option>January</option>
   <option>February</option>
   <option>March</option>
-  <option>April</option>
-  <option>May</option>
-  <option>June</option>
-  <option>July</option>
-  <option>August</option>
-  <option>September</option>
-  <option>October</option>
-  <option>November</option>
-  <option>December</option>
+  ...
 </select>
 
 <label>Upload Org Chart (PDF or Visio)</label>
@@ -102,29 +93,39 @@ Thanks for assisting with bringing Concentra Payroll Services Live!
       message.style.display = 'block';
     }
 
-form.addEventListener('submit', async (event) => {
-  event.preventDefault();
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
 
-  const formData = new FormData(form);
+      const formData = new FormData(form);
 
-  try {
-    const res = await fetch('/api/submit', {
-      method: 'POST',
-      body: formData
-    });
-
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.error || 'Submission failed');
-    }
-
-    form.reset();
-    showMessage('Thank you. Your response has been submitted.', 'success');
-
-  } catch (err) {
-    showMessage(err.message || 'Unable to submit response.', 'error');
-  }
+await fetch('/api/submit', {
+  method: 'POST',
+  body: formData
 });
+const payload = {
+  fullName: String(formData.get('fullName') || '').trim(),
+  workEmail: String(formData.get('workEmail') || '').trim(),
+  answer: formData.get('answer')
+};
+
+      try {
+        const res = await fetch('/api/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || 'Submission failed');
+        }
+
+        form.reset();
+        showMessage('Thank you. Your response has been submitted.', 'success');
+      } catch (err) {
+        showMessage(err.message || 'Unable to submit response.', 'error');
+      }
+    });
   </script>
 </body>
 </html>
