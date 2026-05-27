@@ -242,17 +242,13 @@ cron.schedule("0 9 * * *", () => {
   }
 });
 
-app.get("/api/clear-may", async (req, res) => {
+app.get("/api/reset-db", async (req, res) => {
   try {
-    await pool.query(
-      "DELETE FROM responses WHERE month = 'May'"
-    );
-
-    res.send("✅ All May submissions deleted");
-
+    await pool.query("TRUNCATE TABLE responses RESTART IDENTITY");
+    res.send("✅ Database fully reset");
   } catch (err) {
     console.error(err);
-    res.status(500).send("❌ Failed to delete May data");
+    res.status(500).send("❌ Reset failed");
   }
 });
 
