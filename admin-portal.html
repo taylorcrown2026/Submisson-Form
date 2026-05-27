@@ -292,7 +292,8 @@ document.getElementById('selectedMonth').textContent = selectedMonth;
 <td>${escapeHtml(r.department)}</td>
 <td>${escapeHtml(r.month)}</td>
 <td>
-  <a href="${r.fileUrl}" target="_blank">View File</a>
+  <a href="${r.fileUrl}" target="_blank" class="button">View</a>
+  <a href="${r.fileUrl}" download class="button">⬇</a>
 </td>
 <td>${escapeHtml(r.workEmail)}</td>
             </tr>
