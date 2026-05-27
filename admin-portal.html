@@ -38,6 +38,7 @@
       <div class="muted" style="color:#d1fae5">Participant response tracking</div>
     </div>
     <div>
+      <button id="testReminderBtn">Test Reminder System</button>
       <button id="sendEmailsBtn">Send Reminder Emails</button>
       <button id="exportBtn">Export Excel</button>
       <button id="logoutBtn">Log out</button>
@@ -206,6 +207,20 @@ document.getElementById('historyTab').onclick = () => {
         locations.map(l => `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`).join('');
       locationFilter.value = locations.includes(current) ? current : 'All';
     }
+
+    document.getElementById('testReminderBtn').addEventListener('click', async () => {
+  try {
+    const res = await fetch('/api/test-reminders');
+
+    const text = await res.text();
+
+    showMessage("✅ Reminder system triggered successfully", "success");
+
+  } catch (err) {
+    console.error(err);
+    alert("❌ Test failed — check logs");
+  }
+});
 
     async function loadDepartmentFilter() {
   const filter = document.getElementById("departmentFilter");
