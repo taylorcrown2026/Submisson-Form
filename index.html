@@ -51,15 +51,10 @@
 />
 
 <label>Department</label>
-<select name="department" required>
-  <option value="">Select department</option>
-  <option>HR</option>
-  <option>Finance</option>
-  <option>IT</option>
-  <option>Operations</option>
-  <option>Clinical</option>
-  <option>Legal</option>
+<select id="departmentSelect" name="department" required>
+  <option value="">Loading departments...</option>
 </select>
+
 
 <label>Month</label>
 <select name="month" required>
@@ -125,6 +120,30 @@ form.addEventListener('submit', async (event) => {
     showMessage(err.message || 'Unable to submit response.', 'error');
   }
 });
+
+async function loadDepartments() {
+  const select = document.getElementById("departmentSelect");
+
+  try {
+    const res = await fetch("/api/departments");
+    const data = await res.json();
+
+    select.innerHTML = '<option value="">Select department</option>';
+
+    data.departments.forEach(d => {
+      const option = document.createElement("option");
+      option.value = d;
+      option.textContent = d;
+      select.appendChild(option);
+    });
+
+  } catch (err) {
+    select.innerHTML = '<option>Error loading departments</option>';
+    console.error(err);
+  }
+}
+
+loadDepartments();
   </script>
 </body>
 </html>
