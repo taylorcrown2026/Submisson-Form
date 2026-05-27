@@ -124,11 +124,17 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   fileFilter: (req, file, cb) => {
+    const name = file.originalname.toLowerCase();
+
     if (
       file.mimetype === "application/pdf" ||
-      file.originalname.endsWith(".vsdx")
-    ) cb(null, true);
-    else cb(new Error("Only PDF or Visio"));
+      name.endsWith(".vsdx") ||
+      name.endsWith(".vsd")
+    ) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only PDF or Visio files (.vsd / .vsdx) allowed"));
+    }
   }
 });
 
@@ -239,16 +245,6 @@ cron.schedule("0 9 * * *", () => {
   if (tomorrow.getMonth() !== today.getMonth()) {
     console.log("📅 Last day of month reminder");
     sendReminders();
-  }
-});
-
-app.get("/api/reset-db", async (req, res) => {
-  try {
-    await pool.query("TRUNCATE TABLE responses RESTART IDENTITY");
-    res.send("✅ Database fully reset");
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("❌ Reset failed");
   }
 });
 
