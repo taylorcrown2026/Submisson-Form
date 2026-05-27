@@ -100,15 +100,10 @@
 
 <div>
   <label for="departmentFilter">Department</label>
-  <select id="departmentFilter">
-    <option value="All">All</option>
-    <option>HR</option>
-    <option>Finance</option>
-    <option>IT</option>
-    <option>Operations</option>
-    <option>Clinical</option>
-    <option>Legal</option>
-  </select>
+<select id="departmentFilter">
+  <option value="All">Loading...</option>
+</select>
+
 </div>
 
 <div>
@@ -187,6 +182,7 @@ document.getElementById('historyTab').onclick = () => {
     }
 
     async function loadResponses() {
+    await loadDepartmentFilter();
     const now = new Date();
     const currentMonth = now.toLocaleString('default', { month: 'long' });
     monthFilter.value = currentMonth;
@@ -210,6 +206,28 @@ document.getElementById('historyTab').onclick = () => {
         locations.map(l => `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`).join('');
       locationFilter.value = locations.includes(current) ? current : 'All';
     }
+
+    async function loadDepartmentFilter() {
+  const filter = document.getElementById("departmentFilter");
+
+  try {
+    const res = await fetch("/api/departments");
+    const data = await res.json();
+
+    filter.innerHTML = '<option value="All">All</option>';
+
+    data.departments.forEach(d => {
+      const option = document.createElement("option");
+      option.value = d;
+      option.textContent = d;
+      filter.appendChild(option);
+    });
+
+  } catch (err) {
+    filter.innerHTML = '<option value="All">Error</option>';
+    console.error(err);
+  }
+}
 
 function getFiltered() {
   const q = search.value.trim().toLowerCase();
