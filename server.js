@@ -6,6 +6,8 @@ const session = require("express-session");
 const { Pool } = require("pg");
 const multer = require("multer");
 const path = require("path");
+const nodemailer = require("nodemailer");
+const cron = require("node-cron");
 
 
 const fs = require("fs");
@@ -13,6 +15,15 @@ if (!fs.existsSync("uploads")) {
   fs.mkdirSync("uploads");
 }
 
+const transporter = nodemailer.createTransport({
+  host: "smtp.office365.com",
+  port: 587,
+  secure: false,
+  auth: {
+    user: "tcrownover@concentra.com",
+    pass: process.env.EMAIL_PASSWORD
+  }
+});
 
 const app = express();
 
@@ -121,7 +132,110 @@ const upload = multer({
 
 app.use("/uploads", express.static("uploads"));
 
-const DEPARTMENTS = ["HR","Finance","IT","Operations","Clinical","Legal"];
+const DEPARTMENT_EMAILS = {
+  "Executive Leadership": "tcrownover@concentra.com",
+  "President Clinical, Operations, Sales, Marketing, Onsites, Corporate Development, Real Estate": "tcrownover@concentra.com",
+  "Real Estate, Procurement, Strategic Pricing, and Treasury": "tcrownover@concentra.com",
+  "Onsite Health Billing": "tcrownover@concentra.com",
+  "Onsite Health Medical": "tcrownover@concentra.com",
+  "Onsite Health Operations": "tcrownover@concentra.com",
+  "Onsite Health Sales, Customer Success, and Strategy": "tcrownover@concentra.com",
+  "Marketing Innovation": "tcrownover@concentra.com",
+  "Marketing-Customer Success Group": "tcrownover@concentra.com",
+  "Marketing-Telemedicine": "tcrownover@concentra.com",
+  "Medical Clinician Leadership": "tcrownover@concentra.com",
+  "Clinical Content Committee": "tcrownover@concentra.com",
+  "Medical Expert Panel": "tcrownover@concentra.com",
+  "Medical Clinical Analytics Quality": "tcrownover@concentra.com",
+  "Clinical Services Leadership": "tcrownover@concentra.com",
+  "Operations East Group Leadership": "tcrownover@concentra.com",
+  "Operations West Group Leadership": "tcrownover@concentra.com",
+  "National Field Support Implementation": "tcrownover@concentra.com",
+  "Sales, Enterprise Accounts, Payor Relations, Revenue Operations": "tcrownover@concentra.com",
+  "Sales Customer Engagement Enterprise Accounts": "tcrownover@concentra.com",
+  "Sales Payor Relations": "tcrownover@concentra.com",
+  "Revenue Operations": "tcrownover@concentra.com",
+  "Sales Field Sales LDR Special Projects": "tcrownover@concentra.com",
+  "Sales Field Sales East": "tcrownover@concentra.com",
+  "Sales Field Sales Central": "tcrownover@concentra.com",
+  "Sales Field Sales West": "tcrownover@concentra.com",
+  "Reimbursement Government Relations Leadership": "tcrownover@concentra.com",
+  "Reimbursement Government Relations Reimbursement": "tcrownover@concentra.com",
+  "Reimbursement Government Relations Coding Compliance": "tcrownover@concentra.com",
+  "Reimbursement Government Relations Group Health Managed Care Contracting": "tcrownover@concentra.com",
+  "Accounting & Finance": "tcrownover@concentra.com",
+  "IS Leadership Concentra": "tcrownover@concentra.com",
+  "HR Leadership": "tcrownover@concentra.com",
+  "HR Services": "tcrownover@concentra.com",
+  "Talent Acquisition": "tcrownover@concentra.com",
+  "Learning Department": "tcrownover@concentra.com",
+  "Legal Department Leadership": "tcrownover@concentra.com",
+  "St Mary's Managed Pharmacy Program": "tcrownover@concentra.com",
+  "HR Total Rewards": "tcrownover@concentra.com"
+};
+
+const DEPARTMENTS = Object.keys(DEPARTMENT_EMAILS);
+
+const sendReminders = async () => {
+  const now = new Date();
+  const currentMonth = now.toLocaleString('default', { month: 'long' });
+
+  try {
+    const result = await pool.query(
+      "SELECT department FROM responses WHERE month = $1",
+      [currentMonth]
+    );
+
+    const submitted = result.rows.map(r => r.department);
+    const missing = DEPARTMENTS.filter(d => !submitted.includes(d));
+
+    console.log("Missing departments:", missing);
+
+    for (const dept of missing) {
+      const email = DEPARTMENT_EMAILS[dept];
+      if (!email) continue;
+
+      await transporter.sendMail({
+        from: "tcrownover@concentra.com",
+        to: email,
+        subject: `Reminder: Org Chart Submission - ${currentMonth}`,
+        text: `
+Hello,
+
+This is an automated reminder that your department has not yet submitted the required org chart for ${currentMonth}.
+
+Please submit it as soon as possible.
+
+Thank you.
+        `
+      });
+
+      console.log("✅ Email sent to:", dept);
+    }
+
+    console.log(`Email sent to ${dept} (${email})`);
+
+  } catch (err) {
+    console.error("❌ Reminder error:", err);
+  }
+};
+
+cron.schedule("0 9 20,24,28 * *", () => {
+  console.log("⏰ Scheduled reminder run");
+  sendReminders();
+});
+
+cron.schedule("0 9 * * *", () => {
+  const today = new Date();
+  const tomorrow = new Date();
+  tomorrow.setDate(today.getDate() + 1);
+
+  // If tomorrow is next month = today is last day
+  if (tomorrow.getMonth() !== today.getMonth()) {
+    console.log("📅 Last day of month reminder");
+    sendReminders();
+  }
+});
 
 /* =====================
    LOGIN
@@ -254,6 +368,16 @@ app.get("/api/download/:filename", (req, res) => {
       res.status(404).send("File not found");
     }
   });
+});
+
+app.get("/api/test-reminders", async (req, res) => {
+  try {
+    await sendReminders();
+    res.send("✅ Reminder test executed — check logs and email");
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Test failed");
+  }
 });
 
 /* =====================
