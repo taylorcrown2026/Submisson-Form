@@ -292,12 +292,15 @@ document.getElementById('selectedMonth').textContent = selectedMonth;
 <td>${escapeHtml(r.department)}</td>
 <td>${escapeHtml(r.month)}</td>
 <td>
-  <a href="${r.fileUrl}" target>
+  <a href="${r.fileUrl}" target="_blank">View File</a>
+</td>
 <td>${escapeHtml(r.workEmail)}</td>
             </tr>
           `).join('')
         : '<tr><td colspan="6" class="muted">No responses found.</td></tr>';
     }
+
+    renderMissing();
 
     document.querySelectorAll('th[data-sort]').forEach(th =>
       th.addEventListener('click', () => {
@@ -308,7 +311,7 @@ document.getElementById('selectedMonth').textContent = selectedMonth;
       })
     );
 
-[search, answerFilter, locationFilter, monthFilter].forEach(el =>
+[search, departmentFilter, monthFilter].forEach(el =>
   el.addEventListener('input', render)
 );
 
