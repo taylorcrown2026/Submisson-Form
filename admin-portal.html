@@ -38,7 +38,6 @@
       <div class="muted" style="color:#d1fae5">Participant response tracking</div>
     </div>
     <div>
-      <button id="closeMonthBtn">Close Month</button>
       <button id="sendEmailsBtn">Send Reminder Emails</button>
       <button id="exportBtn">Export Excel</button>
       <button id="logoutBtn">Log out</button>
@@ -234,42 +233,17 @@ const matchesView =
   return data;
 }
 
-document.getElementById('closeMonthBtn').addEventListener('click', () => {
-  const months = [
-    "January","February","March","April","May","June",
-    "July","August","September","October","November","December"
-  ];
-
-  let current = monthFilter.value;
-  let index = months.indexOf(current);
-
-  if (index === -1) {
-    alert("Select a valid month first");
-    return;
-  }
-
-  const nextMonth = months[index + 1] || months[0];
-
-  alert(`Month ${current} closed. Moving to ${nextMonth}`);
-
-  monthFilter.value = nextMonth;
-  render();
-});
-
     function render() {
 const selectedMonth = monthFilter.value;
 
 // If "All" is selected, show everything, otherwise filter by month
-const filteredMonthData =
-  selectedMonth === 'All'
-    ? responses
-    : responses.filter(r => r.month === selectedMonth);
+const filteredMonthData = getFiltered();
 
 // Master department list
 const ALL_DEPARTMENTS = ["HR","Finance","IT","Operations","Clinical","Legal"];
 
 // Get departments that submitted
-const submittedDepts = filteredMonthData.map(r => r.department);
+const submittedDepts = [...new Set(filteredMonthData.map(r => r.department))];
 
 // Remove duplicates
 const uniqueSubmitted = [...new Set(submittedDepts)];
